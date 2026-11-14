@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f4ed">
+  <title>シークレット・プレゼント交換</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:#f7f4ed;color:#292821;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;display:grid;place-items:center;padding:22px}
+    main{width:min(100%,440px);background:#fff;border-radius:24px;padding:28px 22px;box-shadow:0 12px 40px #342d1914}
+    h1{font-size:25px;margin:0 0 8px} .sub{color:#777;margin:0 0 26px;font-size:14px}
+    label{display:block;font-weight:650;margin:16px 0 8px}
+    select,input{width:100%;font:inherit;padding:14px;border:1px solid #d9d6ce;border-radius:12px;background:#fff}
+    button{width:100%;margin-top:20px;border:0;border-radius:12px;padding:15px;background:#247b58;color:#fff;font-size:16px;font-weight:700}
+    button:disabled{opacity:.55}
+    .note{font-size:12px;color:#777;line-height:1.6;margin-top:18px}
+    #message{margin-top:16px;color:#a33;font-size:14px;line-height:1.5}
+    #result{display:none;margin-top:22px;padding:22px 14px;background:#f0f7f2;border-radius:16px;text-align:center}
+    #result small{display:block;color:#52715d}
+    #recipient{display:block;font-size:30px;font-weight:800;margin-top:8px;color:#17613e}
+  </style>
+</head>
+<body>
+<main>
+  <h1>🎁 シークレット・プレゼント交換</h1>
+  <p class="sub">自分の名前と専用PINを入力してください。</p>
+  <form id="form">
+    <label for="name">あなたの名前</label>
+    <select id="name" required>
+      <option value="">選択してください</option>
+      <option>けー</option><option>のぶ</option><option>いーちゃん</option><option>ゆき</option><option>ざわ</option>
+    </select>
+    <label for="pin">あなた専用のPIN（8文字）</label>
+    <input id="pin" type="password" inputmode="text" autocomplete="off" minlength="8" maxlength="8" placeholder="個別に届いたPIN" required>
+    <button id="submit" type="submit">贈り先を確認する</button>
+  </form>
+  <div id="message" role="status"></div>
+  <section id="result" aria-live="polite">
+    <small>あなたがプレゼントを贈る相手は…</small>
+    <strong id="recipient"></strong>
+    <small style="margin-top:10px">この結果を大切にしてください 🎉</small>
+  </section>
+  <p class="note">PINは他の人に教えないでください。共用端末では結果確認後にページを閉じてください。</p>
+</main>
+<script>
+  // 公開前に、下の2つを自分のSupabase情報に置き換えてください。
+  const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+  const SUPABASE_PUBLISHABLE_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+
+  const form = document.getElementById("form");
+  const button = document.getElementById("submit");
+  const message = document.getElementById("message");
+  const result = document.getElementById("result");
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    message.textContent = "";
+    result.style.display = "none";
+
+    if (SUPABASE_URL.includes("YOUR_") || SUPABASE_PUBLISHABLE_KEY.includes("YOUR_")) {
+      message.textContent = "アプリの接続設定がまだ完了していません。主催者に連絡してください。";
+      return;
+    }
+
+    const name = document.getElementById("name").value;
+    const pin = document.getElementById("pin").value.trim();
+    if (!name || pin.length !== 8) {
+      message.textContent = "名前を選択し、8文字のPINを入力してください。";
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = "確認中…";
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/reveal_gift_recipient`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_PUBLISHABLE_KEY,
+          "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+        },
+        body: JSON.stringify({ p_name: name, p_pin: pin })
+      });
+      if (!response.ok) throw new Error("request failed");
+      const data = await response.json();
+      if (!Array.isArray(data) || data.length !== 1 || !data[0].recipient) {
+        message.textContent = "名前またはPINが正しくありません。もう一度確認してください。";
+        return;
+      }
+      document.getElementById("recipient").textContent = data[0].recipient;
+      result.style.display = "block";
+    } catch (_) {
+      message.textContent = "通信に失敗しました。時間をおいて再度お試しください。";
+    } finally {
+      button.disabled = false;
+      button.textContent = "贈り先を確認する";
+    }
+  });
+</script>
+</body>
+</html>
